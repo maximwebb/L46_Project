@@ -1,20 +1,14 @@
-from data import get_test_loader, get_train_loader
+from data import get_test_loader, get_train_loader, get_train_loader_mnist, get_test_loader_mnist
 from models import BasicCNN
 
 import torch
-from torch import nn
-import torch.optim as optim
-from torch.nn.functional import softmax
 
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from PIL import Image
 
-
-def get_class_names():
-    return ['plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+from train import train, test
 
 
 def imshow(im):
@@ -24,61 +18,32 @@ def imshow(im):
     plt.show()
 
 
-def top_5_classes(y):
-    class_names = get_class_names()
-    p = softmax(y[0, :], dim=0)
-    values, indices = p.topk(5)
-    return [(class_names[index], value) for index, value in zip(indices.detach().numpy(), values.detach().numpy())]
-
-
-def train(net, train_data, epochs):
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-
-    for epoch in range(epochs):  # loop over the dataset multiple times
-        running_loss = 0.0
-        for i, data in enumerate(train_data):
-            inputs, labels = data
-
-            optimizer.zero_grad()
-
-            y = net(inputs)
-            loss = criterion(y, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-            if i % 2000 == 1999:
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
-                running_loss = 0.0
-
-
-def test(model, test_data):
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for data in test_data:
-            images, labels = data
-            y = model(images)
-            _, preds = torch.max(y.data, 1)
-            total += labels.size(0)
-            correct += (preds == labels).sum().item()
-    print(f"Accuracy of model: {100 * correct / total:.1f}%")
-
-
 if __name__ == "__main__":
     img = Image.open("data/blas.jpg")
 
-    train_loader = get_train_loader()
-    test_loader = get_test_loader()
+    batch_size = 10
+
+    train_loader = get_train_loader_mnist(batch_size=batch_size)
+    test_loader = get_test_loader_mnist()
+    # train_loader = get_train_loader()
+    # test_loader = get_test_loader()
     basic_cnn = BasicCNN()
 
-    PATH = "saved_models/basic_cnn.pth"
-    if os.path.exists(PATH):
+    retrain = False
+
+    # PATH = "asdf"
+    PATH = "saved_models/dp_cnn_actual.pth"
+    if os.path.exists(PATH) and not retrain:
         print("Loading existing model")
         basic_cnn.load_state_dict(torch.load(PATH))
     else:
-        train(basic_cnn, train_loader, 3)
+        acc, loss = train(basic_cnn, train_loader, 8, epsilon=4, sensitivity=3, lot_size=batch_size)
+        print(acc)
         torch.save(basic_cnn.state_dict(), PATH)
+        x = np.linspace(0, 2000 * len(acc), len(acc))
+        plt.plot(x, acc, label="Accuracy")
+        plt.plot(x, loss, label="Loss")
+        plt.legend()
 
     test(basic_cnn, test_loader)
+    plt.show()
