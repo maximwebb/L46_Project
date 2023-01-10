@@ -10,12 +10,17 @@ def laplace_mechanism(grad, epsilon, sensitivity, lot_size):
     noise = torch.from_numpy(np.random.laplace(0, scale=sensitivity / (epsilon * lot_size), size=grad.size())).float()
     norm = np.linalg.norm(np.reshape(grad, -1), ord=2)
     clipped_grad = grad if norm < sensitivity else sensitivity * grad / norm
-    return clipped_grad + noise
+    clipped_grad = clipped_grad + noise
+
+    dp_norm = np.linalg.norm(np.reshape(clipped_grad, -1), ord=2)
+    clipped_grad = clipped_grad if dp_norm < sensitivity else sensitivity * clipped_grad / dp_norm
+    return clipped_grad
 
 
-def train(net, train_data, epochs, epsilon: Optional[float], sensitivity: Optional[float], lot_size=1):
+def train(net, train_data, epochs, epsilon: Optional[float], sensitivity: Optional[float], lot_size=10,
+          lr=0.001, report_iterations=2000):
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
 
     # Apply Laplace Mechanism by registering hook
     if epsilon and sensitivity:
@@ -43,20 +48,18 @@ def train(net, train_data, epochs, epsilon: Optional[float], sensitivity: Option
             _, preds = torch.max(y.data, 1)
             total_count += labels.size(0)
             correct_count += (preds == labels).sum().item()
-            if i % 2000 == 1999:
+            if i % report_iterations == report_iterations - 1:
                 print(
-                    f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}, '
+                    f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / report_iterations:.3f}, '
                     f'acc: {correct_count / total_count:.3f}')
                 # for j, layer in enumerate(net.children()):
                 #     if hasattr(layer, "weight"):
                 #         print(f"Layer {j}: {layer.weight.size()}, {np.linalg.norm(np.reshape(layer.weight.grad, -1), ord=2)}")
-                loss_scores.append(running_loss / 2000)
+                loss_scores.append(running_loss / report_iterations)
                 accuracy_scores.append(correct_count / total_count)
                 correct_count = 0
                 running_loss = 0.0
                 total_count = 0
-    print(f"Accuracy: {accuracy_scores}")
-    print(f"Loss: {loss_scores}")
     return accuracy_scores, loss_scores
 
 
@@ -71,3 +74,4 @@ def test(model, test_data):
             total += labels.size(0)
             correct += (preds == labels).sum().item()
     print(f"Accuracy of model: {100 * correct / total:.1f}%")
+    return correct / total

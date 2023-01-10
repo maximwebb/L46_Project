@@ -14,7 +14,7 @@ def get_train_loader(batch_size=4):
     return trainloader
 
 
-def get_train_loader_mnist(batch_size=4):
+def get_train_loader_mnist(lot_size=4):
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Pad(2),
@@ -22,7 +22,7 @@ def get_train_loader_mnist(batch_size=4):
          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     trainset = torchvision.datasets.MNIST(root='./data', train=True,
                                           download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=lot_size,
                                               shuffle=True, num_workers=4, pin_memory=True)
     return trainloader
 
